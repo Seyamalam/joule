@@ -121,6 +121,13 @@ assets/
   dashboard.html  the popover UI
 ```
 
+## Contributing
+
+PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the ground rules
+(it's a deliberately tiny project; the rules mostly exist to keep it that
+way). Bug reports and feature requests use the issue templates. Security
+reports go through [SECURITY.md](SECURITY.md), not public issues.
+
 ## Caveats
 
 - Numbers are **tokens**, not billed ACU. Devin's credit/ACU accounting is
