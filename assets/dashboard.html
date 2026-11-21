@@ -7,7 +7,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font: 12px/1.45 -apple-system, "SF Pro Text", sans-serif;
-  width: 300px; padding: 14px;
+  width: 420px; padding: 14px; overflow-x: hidden;
   background: transparent; color: CanvasText;
 }
 .sec { font-size: 10px; letter-spacing: .4px; color: GrayText; margin-bottom: 3px; }
@@ -21,10 +21,12 @@ body {
 .src { color: DarkGray; margin-top: 2px; }
 .card { background: rgba(48,209,88,.10); border-radius: 8px; padding: 8px; margin: 6px 0; }
 .chart { display: flex; align-items: flex-end; gap: 2px; height: 34px; margin: 8px 0 4px; }
-.bar { flex: 1; border-radius: 1.5px; background: AccentColor; opacity: .55; min-height: 3px; }
+.col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 1px; height: 100%; }
+.bar { border-radius: 1.5px; background: AccentColor; opacity: .55; min-height: 0; }
 .bar.now { opacity: 1; }
 .bar.future { background: GrayText; opacity: .15; }
 .bar.remote { background: #bf5af2; opacity: .55; }
+.bar.remote.now { opacity: .9; }
 .rowline { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
 .rowline .l { color: GrayText; }
 .mono { font-variant-numeric: tabular-nums; }
@@ -40,6 +42,14 @@ a.quit { color: AccentColor; text-decoration: none; cursor: pointer; }
 .legend { display: flex; gap: 10px; font-size: 9px; color: GrayText; }
 .legend span { display: flex; align-items: center; gap: 3px; }
 .legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.tip {
+  position: fixed; display: none; z-index: 99; pointer-events: none;
+  background: rgba(30,30,32,.94); color: #f2f2f2; border-radius: 6px;
+  padding: 5px 8px; font-size: 10.5px; line-height: 1.5; white-space: pre-line;
+  box-shadow: 0 2px 10px rgba(0,0,0,.35); max-width: 300px;
+  font-variant-numeric: tabular-nums;
+}
+[data-tip] { cursor: default; }
 </style>
 </head>
 <body>
@@ -67,12 +77,32 @@ a.quit { color: AccentColor; text-decoration: none; cursor: pointer; }
 <div id="models"></div>
 <div class="machines" id="machines"></div>
 <div class="foot"><span id="path">~/.config/devin-usage</span><a class="quit" id="quit">Quit</a></div>
+<div class="tip" id="tip"></div>
 <script>
 const $ = id => document.getElementById(id);
 const fmt = n => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : ''+n;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tip = $('tip');
 
 $('quit').onclick = () => window.webkit.messageHandlers.action.postMessage('quit');
+
+// custom tooltip: follows the cursor, reads data-tip off whatever is under it
+document.addEventListener('mousemove', e => {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if (!t) { tip.style.display = 'none'; return; }
+  tip.textContent = t.getAttribute('data-tip');
+  tip.style.display = 'block';
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 12, y = e.clientY + 14;
+  if (x + w > window.innerWidth - 6) x = e.clientX - w - 10;
+  if (y + h > window.innerHeight - 6) y = e.clientY - h - 10;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+document.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+
+const statTip = s => 'in ' + fmt(s.input) + ' · out ' + fmt(s.output) +
+  ' · cache ' + fmt(s.cache) + '\n' + s.reqs.toLocaleString() + ' requests';
+const sessTip = s => s.title + '\n' + statTip(s) + (s.machine !== 'mac' ? ' · ' + s.machine : '');
 
 function render(S) {
   $('today').textContent = fmt(S.today.input_tokens + S.today.output_tokens);
@@ -85,45 +115,61 @@ function render(S) {
 
   $('live').innerHTML = S.live.length
     ? '<div class="card"><div class="sec"><span class="dot"></span> LIVE NOW</div>' +
-      S.live.map(s => '<div class="item"><span class="t">' + esc(s.title) + '</span>' +
+      S.live.map(s => '<div class="item" data-tip="' + esc(sessTip(s)) + '"><span class="t">' + esc(s.title) + '</span>' +
         (s.machine !== 'mac' ? '<span class="tag">'+esc(s.machine)+'</span>' : '') +
         '<span class="v">' + fmt(s.in_out) + '</span></div>').join('') + '</div>'
     : '';
   $('livecount').textContent = S.live.length ? S.live.length + ' live' : '';
 
+  // hourly chart: stacked this-mac / remotes, same legend as the 14-day chart
   const nowH = new Date().getHours();
-  const hmax = Math.max(1, ...S.hours);
-  $('hours').innerHTML = S.hours.map((v, i) =>
-    '<div class="bar' + (i === nowH ? ' now' : i > nowH ? ' future' : '') +
-    '" style="height:' + (3 + 30 * v / hmax) + 'px"></div>').join('');
+  const hmax = Math.max(1, ...S.hours_local.map((v, i) => v + S.hours_remote[i]));
+  $('hours').innerHTML = S.hours_local.map((lv, i) => {
+    const rv = S.hours_remote[i] || 0, tot = lv + rv;
+    const cls = i === nowH ? ' now' : i > nowH ? ' future' : '';
+    const t = String(i).padStart(2,'0') + ':00 – ' + String((i+1)%24).padStart(2,'0') + ':00\n' +
+      'this mac ' + fmt(lv) + ' · remotes ' + fmt(rv) + '\ntotal ' + fmt(tot);
+    return '<div class="col" data-tip="' + esc(t) + '">' +
+      '<div class="bar remote' + cls + '" style="height:' + (30 * rv / hmax) + 'px;min-height:' + (rv ? 2 : 0) + 'px"></div>' +
+      '<div class="bar' + cls + '" style="height:' + (30 * lv / hmax) + 'px;min-height:' + (lv ? 2 : 0) + 'px"></div></div>';
+  }).join('');
 
   const dmax = Math.max(1, ...S.days14.map(d => d.local + d.remote));
-  $('days').innerHTML = S.days14.map(d =>
-    '<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;height:100%">' +
-    '<div class="bar remote" style="height:' + (42 * d.remote / dmax) + 'px;min-height:' + (d.remote ? 2 : 0) + 'px"></div>' +
-    '<div class="bar" style="height:' + (42 * d.local / dmax) + 'px;min-height:' + (d.local ? 2 : 0) + 'px"></div></div>').join('');
+  $('days').innerHTML = S.days14.map(d => {
+    const t = d.date + '\nthis mac ' + fmt(d.local) + ' · remotes ' + fmt(d.remote) +
+      '\ntotal ' + fmt(d.local + d.remote);
+    return '<div class="col" data-tip="' + esc(t) + '">' +
+      '<div class="bar remote" style="height:' + (42 * d.remote / dmax) + 'px;min-height:' + (d.remote ? 2 : 0) + 'px"></div>' +
+      '<div class="bar" style="height:' + (42 * d.local / dmax) + 'px;min-height:' + (d.local ? 2 : 0) + 'px"></div></div>';
+  }).join('');
 
   $('sums').innerHTML =
     sumrow('This week', S.week) + sumrow('All time', S.all_time);
 
   $('sessions').innerHTML = S.top_sessions.length ? S.top_sessions.map(s =>
-    '<div class="item">' + (s.live ? '<span class="dot" style="width:5px;height:5px"></span>' : '') +
+    '<div class="item" data-tip="' + esc(sessTip(s)) + '">' + (s.live ? '<span class="dot" style="width:5px;height:5px"></span>' : '') +
     '<span class="t">' + esc(s.title) + '</span>' +
     (s.machine !== 'mac' ? '<span class="tag">' + esc(s.machine) + '</span>' : '') +
     '<span class="v">' + fmt(s.in_out) + '</span></div>').join('')
     : '<div class="item" style="color:GrayText">no sessions yet</div>';
 
-  $('projects').innerHTML = S.projects.length ? S.projects.map(([n, v]) =>
-    '<div class="item"><span class="t">' + esc(n) + '</span><span class="v">' + fmt(v) + '</span></div>').join('')
+  $('projects').innerHTML = S.projects.length ? S.projects.map(s =>
+    '<div class="item" data-tip="' + esc(s.name + '\n' + statTip(s)) + '"><span class="t">' + esc(s.name) +
+    '</span><span class="v">' + fmt(s.in_out) + '</span></div>').join('')
     : '<div class="item" style="color:GrayText">none</div>';
 
-  $('models').innerHTML = S.models.map(([n, v]) =>
-    '<div class="item"><span class="t">' + esc(n) + '</span><span class="v">' + fmt(v) + '</span></div>').join('');
+  $('models').innerHTML = S.models.map(s =>
+    '<div class="item" data-tip="' + esc(s.name + '\n' + statTip(s)) + '"><span class="t">' + esc(s.name) +
+    '</span><span class="v">' + fmt(s.in_out) + '</span></div>').join('');
 
-  $('machines').innerHTML = S.machines.map(m =>
-    '<span' + (m.error ? ' class="bad" title="' + esc(m.error) + '"' : '') + '>' +
-    esc(m.name) + ' ' + (m.error ? '✗' : '✓') +
-    (m.stale_secs != null ? ' ' + Math.round(m.stale_secs) + 's' : '') + '</span>').join('');
+  $('machines').innerHTML = S.machines.map(m => {
+    const t = m.error ? m.name + ' — ' + m.error
+      : m.name + ' — ok' + (m.stale_secs != null ? ', last poll ' + Math.round(m.stale_secs) + 's ago' : '') +
+        '\ntoday ' + fmt(m.today_in_out);
+    return '<span' + (m.error ? ' class="bad"' : '') + ' data-tip="' + esc(t) + '">' +
+      esc(m.name) + ' ' + (m.error ? '✗' : '✓') +
+      (m.stale_secs != null ? ' ' + Math.round(m.stale_secs) + 's' : '') + '</span>';
+  }).join('');
 }
 function sumrow(l, s) {
   return '<div class="rowline"><span class="l">' + l + '</span><span class="mono">' +

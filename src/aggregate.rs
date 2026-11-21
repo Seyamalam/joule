@@ -22,6 +22,10 @@ pub struct SessionRow {
     pub title: String,
     pub machine: String,
     pub in_out: i64,
+    pub input: i64,
+    pub output: i64,
+    pub cache: i64,
+    pub reqs: i64,
     pub live: bool,
 }
 
@@ -32,6 +36,17 @@ pub struct DayBar {
     pub remote: i64,
 }
 
+/// A named row (model or project) with full stats for tooltips.
+#[derive(Serialize)]
+pub struct LabelStat {
+    pub name: String,
+    pub in_out: i64,
+    pub input: i64,
+    pub output: i64,
+    pub cache: i64,
+    pub reqs: i64,
+}
+
 #[derive(Serialize)]
 pub struct Render {
     pub today: Stats,
@@ -39,12 +54,14 @@ pub struct Render {
     pub remote_today: Stats,
     pub week: Stats,
     pub all_time: Stats,
-    pub hours: Vec<i64>,       // 24 in+out buckets (local+remote merged)
+    /// 24 in+out buckets per machine class (stacked in the hourly chart).
+    pub hours_local: Vec<i64>,
+    pub hours_remote: Vec<i64>,
     pub days14: Vec<DayBar>,   // 14-day history for the stacked chart
     pub live: Vec<SessionRow>, // currently active sessions
     pub top_sessions: Vec<SessionRow>,
-    pub models: Vec<(String, i64)>,
-    pub projects: Vec<(String, i64)>,
+    pub models: Vec<LabelStat>,
+    pub projects: Vec<LabelStat>,
     pub machines: Vec<MachineInfo>,
 }
 
@@ -151,7 +168,7 @@ impl<'a> View<'a> {
     fn merged_map(
         &self,
         pick: impl Fn(&MachineState) -> Option<&BTreeMap<String, Stats>>,
-    ) -> Vec<(String, i64)> {
+    ) -> Vec<LabelStat> {
         let mut acc: HashMap<String, Stats> = HashMap::new();
         let mut fold = |m: &MachineState| {
             if let Some(map) = pick(m) {
@@ -164,8 +181,18 @@ impl<'a> View<'a> {
         for m in self.state.remotes.values() {
             fold(m);
         }
-        let mut v: Vec<_> = acc.into_iter().map(|(k, s)| (k, s.in_plus_out())).collect();
-        v.sort_by(|a, b| b.1.cmp(&a.1));
+        let mut v: Vec<_> = acc
+            .into_iter()
+            .map(|(k, s)| LabelStat {
+                name: k,
+                in_out: s.in_plus_out(),
+                input: s.input_tokens,
+                output: s.output_tokens,
+                cache: s.cache_read_tokens,
+                reqs: s.requests,
+            })
+            .collect();
+        v.sort_by(|a, b| b.in_out.cmp(&a.in_out));
         v
     }
 
@@ -180,13 +207,14 @@ impl<'a> View<'a> {
             .unwrap_or_default();
         let remote_today = self.remote_today();
 
-        // 24h merged buckets
-        let mut hours = vec![0i64; 24];
+        // 24h buckets, split local vs remote for the stacked chart
+        let mut hours_local = vec![0i64; 24];
+        let mut hours_remote = vec![0i64; 24];
         if self.state.local.hours_date == self.today {
             for (h, s) in &self.state.local.hours {
                 if let Ok(i) = h.parse::<usize>() {
                     if i < 24 {
-                        hours[i] += s.in_plus_out();
+                        hours_local[i] += s.in_plus_out();
                     }
                 }
             }
@@ -196,7 +224,7 @@ impl<'a> View<'a> {
                 for (h, s) in &m.hours {
                     if let Ok(i) = h.parse::<usize>() {
                         if i < 24 {
-                            hours[i] += s.in_plus_out();
+                            hours_remote[i] += s.in_plus_out();
                         }
                     }
                 }
@@ -246,6 +274,10 @@ impl<'a> View<'a> {
                         title: self.title_of(m, sid),
                         machine: machine.to_string(),
                         in_out: s.in_plus_out(),
+                        input: s.input_tokens,
+                        output: s.output_tokens,
+                        cache: s.cache_read_tokens,
+                        reqs: s.requests,
                         live: self.is_live(sid),
                     });
                 }
@@ -264,6 +296,10 @@ impl<'a> View<'a> {
                 title: s.title.clone(),
                 machine: s.machine.clone(),
                 in_out: s.in_out,
+                input: s.input,
+                output: s.output,
+                cache: s.cache,
+                reqs: s.reqs,
                 live: true,
             })
             .collect();
@@ -298,7 +334,8 @@ impl<'a> View<'a> {
             remote_today,
             week: self.sum_range(7),
             all_time: self.sum_all(),
-            hours,
+            hours_local,
+            hours_remote,
             days14,
             live,
             top_sessions: sessions.into_iter().take(6).collect(),

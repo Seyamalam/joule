@@ -179,7 +179,7 @@ pub fn run(engine: Arc<Engine>) {
         msg_send![allocated, initWithFrame: NSRect::ZERO, configuration: &*config]
     };
     unsafe {
-        let _: () = msg_send![&wv, setFrameSize: NSSize { width: 300.0, height: 560.0 }];
+        let _: () = msg_send![&wv, setFrameSize: NSSize { width: 420.0, height: 600.0 }];
     }
     let html = NSString::from_str(DASHBOARD_HTML);
     let _: Option<Retained<AnyObject>> =
@@ -213,7 +213,12 @@ pub fn run(engine: Arc<Engine>) {
         );
         let render = view.render();
         let title = compact(render.today.in_plus_out());
-        let hours = render.hours.clone();
+        let hours: Vec<i64> = render
+            .hours_local
+            .iter()
+            .zip(&render.hours_remote)
+            .map(|(l, r)| l + r)
+            .collect();
         if let Ok(json) = serde_json::to_string(&render) {
             dispatch::Queue::main().exec_async(move || unsafe {
                 ui_mut().update(&title, &json, &hours);
