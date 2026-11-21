@@ -1,0 +1,34 @@
+[package]
+name = "devin-usage"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Lightweight macOS menu bar tracker for Devin CLI token usage across local and remote machines"
+repository = "https://github.com/Seyamalam/devin-usage"
+keywords = ["devin", "menubar", "usage", "tokens", "macos"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+chrono = "0.4"
+iana-time-zone = "0.1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+dirs = "5"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
+objc2-web-kit = "0.3"
+block2 = "0.6"
+dispatch = "0.2"
+libc = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true

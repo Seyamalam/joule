@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+:root { color-scheme: light dark; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font: 12px/1.45 -apple-system, "SF Pro Text", sans-serif;
+  width: 300px; padding: 14px;
+  background: transparent; color: CanvasText;
+}
+.sec { font-size: 10px; letter-spacing: .4px; color: GrayText; margin-bottom: 3px; }
+.hdr { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+.hdr .dot { margin-left: auto; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #30d158; display: inline-block; }
+.live-tag { color: GrayText; font-size: 11px; }
+.big { font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kv { display: flex; gap: 14px; color: GrayText; font-size: 11px; margin-top: 2px; }
+.kv b { color: CanvasText; font-weight: 500; }
+.src { color: DarkGray; margin-top: 2px; }
+.card { background: rgba(48,209,88,.10); border-radius: 8px; padding: 8px; margin: 6px 0; }
+.chart { display: flex; align-items: flex-end; gap: 2px; height: 34px; margin: 8px 0 4px; }
+.bar { flex: 1; border-radius: 1.5px; background: AccentColor; opacity: .55; min-height: 3px; }
+.bar.now { opacity: 1; }
+.bar.future { background: GrayText; opacity: .15; }
+.bar.remote { background: #bf5af2; opacity: .55; }
+.rowline { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
+.rowline .l { color: GrayText; }
+.mono { font-variant-numeric: tabular-nums; }
+.item { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 1px 0; }
+.item .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .v { margin-left: auto; color: GrayText; font-variant-numeric: tabular-nums; }
+.tag { font-size: 9px; color: GrayText; border: 1px solid rgba(128,128,128,.4); border-radius: 3px; padding: 0 3px; }
+.machines { display: flex; gap: 10px; flex-wrap: wrap; font-size: 10px; color: GrayText; margin-top: 6px; }
+.machines .bad { color: #ff453a; }
+div.sep { border-top: 1px solid rgba(128,128,128,.25); margin: 10px 0; }
+.foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 10px; color: DarkGray; }
+a.quit { color: AccentColor; text-decoration: none; cursor: pointer; }
+.legend { display: flex; gap: 10px; font-size: 9px; color: GrayText; }
+.legend span { display: flex; align-items: center; gap: 3px; }
+.legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="hdr">Devin Usage <span class="dot"></span><span class="live-tag" id="livecount"></span></div>
+<div id="live"></div>
+<div style="margin-top:10px">
+  <div class="sec">TODAY <span id="srcsplit" class="src"></span></div>
+  <div class="big" id="today">0</div>
+  <div class="kv" id="todaykv"></div>
+</div>
+<div class="chart" id="hours"></div>
+<div class="sec">LAST 14 DAYS</div>
+<div class="chart" style="height:44px" id="days"></div>
+<div class="legend"><span><i style="background:AccentColor;opacity:.55"></i>this mac</span><span><i style="background:#bf5af2"></i>remotes</span></div>
+<div class="sep"></div>
+<div id="sums"></div>
+<div class="sep"></div>
+<div class="sec">TOP SESSIONS TODAY</div>
+<div id="sessions"></div>
+<div class="sep"></div>
+<div class="sec">PROJECTS TODAY</div>
+<div id="projects"></div>
+<div class="sep"></div>
+<div class="sec">MODELS TODAY</div>
+<div id="models"></div>
+<div class="machines" id="machines"></div>
+<div class="foot"><span id="path">~/.config/devin-usage</span><a class="quit" id="quit">Quit</a></div>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : ''+n;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+$('quit').onclick = () => window.webkit.messageHandlers.action.postMessage('quit');
+
+function render(S) {
+  $('today').textContent = fmt(S.today.input_tokens + S.today.output_tokens);
+  $('srcsplit').textContent = '  ' + S.machines.map(m => m.name + ' ' + fmt(m.today_in_out)).join(' · ');
+  $('todaykv').innerHTML =
+    '<span>in <b>' + fmt(S.today.input_tokens) + '</b></span>' +
+    '<span>out <b>' + fmt(S.today.output_tokens) + '</b></span>' +
+    '<span>cache <b>' + fmt(S.today.cache_read_tokens) + '</b></span>' +
+    '<span>reqs <b>' + S.today.requests + '</b></span>';
+
+  $('live').innerHTML = S.live.length
+    ? '<div class="card"><div class="sec"><span class="dot"></span> LIVE NOW</div>' +
+      S.live.map(s => '<div class="item"><span class="t">' + esc(s.title) + '</span>' +
+        (s.machine !== 'mac' ? '<span class="tag">'+esc(s.machine)+'</span>' : '') +
+        '<span class="v">' + fmt(s.in_out) + '</span></div>').join('') + '</div>'
+    : '';
+  $('livecount').textContent = S.live.length ? S.live.length + ' live' : '';
+
+  const nowH = new Date().getHours();
+  const hmax = Math.max(1, ...S.hours);
+  $('hours').innerHTML = S.hours.map((v, i) =>
+    '<div class="bar' + (i === nowH ? ' now' : i > nowH ? ' future' : '') +
+    '" style="height:' + (3 + 30 * v / hmax) + 'px"></div>').join('');
+
+  const dmax = Math.max(1, ...S.days14.map(d => d.local + d.remote));
+  $('days').innerHTML = S.days14.map(d =>
+    '<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;height:100%">' +
+    '<div class="bar remote" style="height:' + (42 * d.remote / dmax) + 'px;min-height:' + (d.remote ? 2 : 0) + 'px"></div>' +
+    '<div class="bar" style="height:' + (42 * d.local / dmax) + 'px;min-height:' + (d.local ? 2 : 0) + 'px"></div></div>').join('');
+
+  $('sums').innerHTML =
+    sumrow('This week', S.week) + sumrow('All time', S.all_time);
+
+  $('sessions').innerHTML = S.top_sessions.length ? S.top_sessions.map(s =>
+    '<div class="item">' + (s.live ? '<span class="dot" style="width:5px;height:5px"></span>' : '') +
+    '<span class="t">' + esc(s.title) + '</span>' +
+    (s.machine !== 'mac' ? '<span class="tag">' + esc(s.machine) + '</span>' : '') +
+    '<span class="v">' + fmt(s.in_out) + '</span></div>').join('')
+    : '<div class="item" style="color:GrayText">no sessions yet</div>';
+
+  $('projects').innerHTML = S.projects.length ? S.projects.map(([n, v]) =>
+    '<div class="item"><span class="t">' + esc(n) + '</span><span class="v">' + fmt(v) + '</span></div>').join('')
+    : '<div class="item" style="color:GrayText">none</div>';
+
+  $('models').innerHTML = S.models.map(([n, v]) =>
+    '<div class="item"><span class="t">' + esc(n) + '</span><span class="v">' + fmt(v) + '</span></div>').join('');
+
+  $('machines').innerHTML = S.machines.map(m =>
+    '<span' + (m.error ? ' class="bad" title="' + esc(m.error) + '"' : '') + '>' +
+    esc(m.name) + ' ' + (m.error ? '✗' : '✓') +
+    (m.stale_secs != null ? ' ' + Math.round(m.stale_secs) + 's' : '') + '</span>').join('');
+}
+function sumrow(l, s) {
+  return '<div class="rowline"><span class="l">' + l + '</span><span class="mono">' +
+    fmt(s.input_tokens) + ' in · ' + fmt(s.output_tokens) + ' out · ' + fmt(s.cache_read_tokens) + ' cache</span></div>';
+}
+</script>
+</body>
+</html>
