@@ -50,6 +50,17 @@ a.quit { color: AccentColor; text-decoration: none; cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 [data-tip] { cursor: default; }
+/* thin overlay scrollbar: transparent track, faint thumb, widens on hover */
+::-webkit-scrollbar { width: 5px; height: 0; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(128,128,128,.22); border-radius: 3px;
+  transition: background .15s;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,.45); }
+::-webkit-scrollbar-corner { background: transparent; }
+.item { border-radius: 5px; padding: 1px 4px; margin: 0 -4px; }
+.item:hover { background: rgba(128,128,128,.12); }
 </style>
 </head>
 <body>
