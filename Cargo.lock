@@ -188,28 +188,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
-name = "devin-usage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "block2",
- "chrono",
- "clap",
- "dirs",
- "dispatch",
- "iana-time-zone",
- "libc",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "objc2-web-kit",
- "rusqlite",
- "serde",
- "serde_json",
- "toml",
-]
-
-[[package]]
 name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,6 +358,28 @@ name = "itoa"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
+
+[[package]]
+name = "joule"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "block2",
+ "chrono",
+ "clap",
+ "dirs",
+ "dispatch",
+ "iana-time-zone",
+ "libc",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-web-kit",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toml",
+]
 
 [[package]]
 name = "js-sys"

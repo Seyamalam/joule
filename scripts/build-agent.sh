@@ -33,5 +33,5 @@ else
 fi
 
 cargo build --release --target "$target"
-cp "target/$target/release/devin-usage" assets/agent-linux-x86_64
+cp "target/$target/release/joule" assets/agent-linux-x86_64
 ls -lh assets/agent-linux-x86_64

@@ -1,7 +1,7 @@
-//! `devin-usage agent` — the mode that runs on remote machines.
+//! `joule agent` — the mode that runs on remote machines.
 //!
 //! The app scp's this same binary (cross-compiled for the remote's
-//! platform) to `~/.devin-usage/devin-usage-agent` and calls:
+//! platform) to `~/.joule/joule-agent` and calls:
 //!   agent rows <last_row_id>   incremental rows + session meta
 //!   agent baseline             full aggregate, for first-time backfill
 //!   agent meta                 session titles + projects

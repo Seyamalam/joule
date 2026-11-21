@@ -1,7 +1,7 @@
 //! Remote machines: SSH polling, self-installing agent, health tracking.
 //!
 //! The remote side is this same binary in `agent` mode, pushed to
-//! `~/.devin-usage/devin-usage-agent` on the remote when missing or outdated.
+//! `~/.joule/joule-agent` on the remote when missing or outdated.
 
 use crate::state::MachineState;
 use anyhow::{bail, Context, Result};
@@ -9,8 +9,8 @@ use serde::Deserialize;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-const AGENT_PATH: &str = "~/.devin-usage/devin-usage-agent";
-const AGENT_DIR: &str = "~/.devin-usage";
+const AGENT_PATH: &str = "~/.joule/joule-agent";
+const AGENT_DIR: &str = "~/.joule";
 
 /// Embedded linux-x86_64 agent binary (static musl). Populated by
 /// `scripts/package.sh` before building the macOS app.
@@ -163,7 +163,7 @@ pub fn poll(
     let body = match ensure_agent(&remote.target).and_then(|_| {
         ssh(
             &remote.target,
-            &format!("{AGENT_PATH} rows {}", m.last_row_id),
+            &format!("{AGENT_PATH} agent rows {}", m.last_row_id),
             15,
         )
     }) {
@@ -230,7 +230,7 @@ pub fn backfill(remote: &Remote, tz: &str) -> Result<MachineState> {
     ensure_agent(&remote.target)?;
     let body = ssh(
         &remote.target,
-        &format!("TZ='{tz}' {AGENT_PATH} baseline"),
+        &format!("TZ='{tz}' {AGENT_PATH} agent baseline"),
         180,
     )?;
     let mut m: MachineState = serde_json::from_slice(&body).context("parse baseline")?;

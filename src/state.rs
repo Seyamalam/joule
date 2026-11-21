@@ -1,4 +1,4 @@
-//! Persisted usage state. Serialized to `~/.config/devin-usage/state.json`
+//! Persisted usage state. Serialized to `~/.config/joule/state.json`
 //! so the app only ever scans *new* database rows after the first backfill.
 
 use crate::stats::Stats;
@@ -102,10 +102,15 @@ pub struct PersistedState {
 
 impl PersistedState {
     pub fn load() -> Self {
-        let path = crate::paths::state_path();
-        if let Ok(data) = std::fs::read(&path) {
-            if let Ok(s) = serde_json::from_slice(&data) {
-                return s;
+        // New path first, then the pre-Joule dir for seamless upgrades.
+        for path in [
+            crate::paths::state_path(),
+            crate::paths::prev_dir().join("state.json"),
+        ] {
+            if let Ok(data) = std::fs::read(&path) {
+                if let Ok(s) = serde_json::from_slice(&data) {
+                    return s;
+                }
             }
         }
         Self::migrate_legacy().unwrap_or_default()

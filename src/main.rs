@@ -18,9 +18,9 @@ use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(
-    name = "devin-usage",
+    name = "joule",
     version,
-    about = "Menu bar tracker for Devin CLI token usage"
+    about = "Joule — energy monitor for Devin CLI usage"
 )]
 struct Cli {
     /// Path to Devin CLI's sessions.db (defaults to the standard location)
@@ -61,7 +61,17 @@ fn db_path(cli: &Cli) -> PathBuf {
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    // The agent binary is invoked as `joule-agent rows|baseline|meta ...`
+    // (bare verbs) by older installers; normalize to `agent <verb>` so both
+    // spellings work.
+    let mut args: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    match args.get(1).and_then(|a| a.to_str()) {
+        Some("rows") | Some("baseline") | Some("meta") => {
+            args.insert(1, "agent".into());
+        }
+        _ => {}
+    }
+    let cli = Cli::parse_from(args);
     match &cli.cmd {
         Some(Cmd::Agent { mode }) => match mode {
             AgentMode::Rows { last } => agent::run_rows(&db_path(&cli), *last),
@@ -138,5 +148,5 @@ fn cmd_app(cli: &Cli) -> Result<()> {
 
 #[cfg(not(target_os = "macos"))]
 fn cmd_app(_cli: &Cli) -> Result<()> {
-    anyhow::bail!("the menu bar app is macOS-only. On Linux/other hosts this binary runs as a remote agent: `devin-usage agent <rows|baseline|meta>`")
+    anyhow::bail!("the menu bar app is macOS-only. On Linux/other hosts this binary runs as a remote agent: `joule agent <rows|baseline|meta>`")
 }

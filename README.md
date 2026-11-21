@@ -1,41 +1,50 @@
-# devin-usage
+<p align="center">
+  <img src="assets/logo.svg" width="128" height="128" alt="Joule logo">
+</p>
 
-A super-lightweight native macOS menu-bar app that tracks your Devin CLI token
-usage — live — across every machine you run Devin on.
+<h1 align="center">Joule</h1>
+
+<p align="center">
+  <b>The energy monitor for your Devins.</b><br>
+  A super-lightweight native macOS menu-bar app that tracks Devin CLI token
+  usage — live — across every machine you run Devin on.
+</p>
 
 - **Native** — one Rust binary, `NSStatusItem` + `NSPopover` + `WKWebView`. No
   Electron, no dock icon, ~5 MB on disk.
 - **Local** — incremental polling of Devin CLI's `sessions.db` (a `row_id`
   range query that costs nothing even on multi-GB databases).
 - **Remote** — any number of SSH-reachable machines. A tiny static musl agent
-  is pushed automatically (`scp`-style over `ssh`, no daemon, no ports) and
-  streams only new rows.
+  is pushed automatically (over `ssh`, no daemon, no ports) and streams only
+  new rows.
 - **Tailscale** — optionally auto-discovers tailnet peers that run Devin CLI
   and adds them on its own.
 
 ## What it shows
 
-- Menu bar: `⚡ 25.1M` — today's input+output tokens across all machines.
+- Menu bar: `⚡ 25.1M` — today's input+output tokens across all machines,
+  plus a live sparkline.
 - Click for the dashboard: combined totals with per-machine split, hourly
   activity, 14-day history (stacked local vs remote), top models, top
   sessions with real titles, per-project spend, and a **LIVE NOW** card for
-  whatever session is burning tokens right now.
+  whatever session is burning tokens right now. Hover anything for details.
 
 ## Install
 
 ```sh
 cargo build --release
-./scripts/package-app.sh            # builds ~/Applications/DevinUsage.app
-./scripts/install-launchagent.sh    # start at login
+./scripts/package-app.sh            # builds ~/Applications/Joule.app
+./scripts/install-launchagent.sh    # start at login (dev.joule.tracker)
 ```
 
-State lives in `~/.config/devin-usage/state.json`; it's safe to delete — the
-app re-baselines from the local DB and remote agents on next start (one-time
-cost).
+State lives in `~/.config/joule/state.json`; it's safe to delete — the app
+re-baselines from the local DB and remote agents on next start (one-time
+cost). Upgrading from `devin-usage`? Your `~/.config/devin-usage` config and
+state are picked up automatically.
 
 ## Configuration
 
-`~/.config/devin-usage/config.toml`:
+`~/.config/joule/config.toml`:
 
 ```toml
 local_name = "this mac"
@@ -63,15 +72,14 @@ credentials are stored or copied anywhere.
 
 ## How remotes work
 
-On first contact the app pushes itself (the embedded
-`assets/agent-linux-x86_64` static musl binary) to
-`~/.devin-usage/devin-usage-agent` on the remote, then polls it:
+On first contact Joule pushes itself (the embedded
+`assets/agent-linux-x86_64` static musl binary) to `~/.joule/joule-agent` on
+the remote, then polls it:
 
 ```sh
-devin-usage agent baseline   # one-time aggregate dump (days/sessions/models)
-devin-usage agent rows <N>   # metric rows with row_id > N (incremental)
-devin-usage agent meta       # session id -> title/project map
-devin-usage agent db-path    # where the devin db lives on this host
+joule agent baseline   # one-time aggregate dump (days/sessions/models)
+joule agent rows <N>   # metric rows with row_id > N (incremental)
+joule agent meta       # session id -> title/project map
 ```
 
 You can install the agent yourself on any Linux/macOS machine; the dashboard
@@ -84,11 +92,11 @@ where it left off — no double counting, no rescan.
 ## CLI
 
 ```sh
-devin-usage            # run the menu-bar app
-devin-usage stats      # combined totals as JSON (both machines)
-devin-usage doctor     # check every configured + discovered remote
-devin-usage baseline   # rebuild local aggregates from scratch
-devin-usage agent …    # remote-side mode (see above)
+joule            # run the menu-bar app
+joule stats      # combined totals as JSON (all machines)
+joule doctor     # check every configured + discovered remote
+joule baseline   # rebuild local aggregates from scratch
+joule agent …    # remote-side mode (see above)
 ```
 
 ## Development
@@ -118,6 +126,7 @@ src/
   tailscale.rs  `tailscale status --json` parsing
   ui/app.rs     NSStatusItem, NSPopover, WKWebView glue (objc2)
 assets/
+  logo.svg        the Joule mark
   dashboard.html  the popover UI
 ```
 

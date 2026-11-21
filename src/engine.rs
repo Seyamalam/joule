@@ -92,7 +92,7 @@ impl Engine {
         for name in &state.discovered {
             if !remotes.iter().any(|r| &r.name == name) {
                 // We don't know its target anymore; rediscovery re-adds it.
-                eprintln!("devin-usage: discovered remote '{name}' needs re-discovery");
+                eprintln!("joule: discovered remote '{name}' needs re-discovery");
             }
         }
         Self {
@@ -332,7 +332,7 @@ impl Engine {
             if !remote::probe_has_devin(&target) {
                 continue;
             }
-            eprintln!("devin-usage: discovered {} on tailnet", p.hostname);
+            eprintln!("joule: discovered {} on tailnet", p.hostname);
             {
                 let mut remotes = self.remotes.lock().unwrap();
                 remotes.push(Remote::new(p.hostname.clone(), target, true));

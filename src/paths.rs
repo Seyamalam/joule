@@ -1,4 +1,4 @@
-//! Filesystem locations. Everything lives under `~/.config/devin-usage/`
+//! Filesystem locations. Everything lives under `~/.config/joule/`
 //! except the Devin CLI database itself.
 
 use std::path::PathBuf;
@@ -14,6 +14,11 @@ pub fn default_db_path() -> PathBuf {
 
 /// Our own directory: config, state, logs.
 pub fn our_dir() -> PathBuf {
+    home().join(".config/joule")
+}
+
+/// Config/state dir from before the Joule rebrand; read as a fallback.
+pub fn prev_dir() -> PathBuf {
     home().join(".config/devin-usage")
 }
 

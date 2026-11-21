@@ -1,4 +1,4 @@
-//! User configuration: `~/.config/devin-usage/config.toml`
+//! User configuration: `~/.config/joule/config.toml`
 //!
 //! ```toml
 //! local_name = "mac"
@@ -79,14 +79,22 @@ impl Default for Config {
 
 impl Config {
     pub fn load() -> Self {
-        let path = crate::paths::config_path();
-        match std::fs::read_to_string(&path) {
-            Ok(text) => toml::from_str(&text).unwrap_or_else(|e| {
-                eprintln!("devin-usage: bad config.toml: {e}");
-                Self::default()
-            }),
-            Err(_) => Self::default(),
+        let paths = [
+            crate::paths::config_path(),
+            crate::paths::prev_dir().join("config.toml"),
+        ];
+        for path in paths {
+            match std::fs::read_to_string(&path) {
+                Ok(text) => {
+                    return toml::from_str(&text).unwrap_or_else(|e| {
+                        eprintln!("joule: bad config.toml: {e}");
+                        Self::default()
+                    });
+                }
+                Err(_) => continue,
+            }
         }
+        Self::default()
     }
 
     /// Write an annotated starter config if none exists.
@@ -100,7 +108,7 @@ impl Config {
     }
 }
 
-const DEFAULT_CONFIG: &str = r#"# devin-usage configuration
+const DEFAULT_CONFIG: &str = r#"# joule configuration
 # local_name = "this mac"
 # local_poll_secs = 3
 # remote_poll_secs = 20
